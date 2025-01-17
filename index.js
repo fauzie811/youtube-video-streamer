@@ -20,8 +20,9 @@ let durationTimeout;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 640,
+    height: 330,
+    resizable: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
