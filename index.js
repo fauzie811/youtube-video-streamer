@@ -34,6 +34,10 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(join(__dirname, 'index.html'));
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 app.whenReady().then(createWindow);
@@ -113,8 +117,8 @@ ipcMain.on(
       if (scheduledTime < new Date()) {
         // Start streaming immediately
         try {
-          await startStreaming(videoPath, streamKey, duration);
           event.reply('streaming-started');
+          await startStreaming(videoPath, streamKey, duration);
         } catch (error) {
           event.reply('streaming-error', error.message);
         }
@@ -122,8 +126,8 @@ ipcMain.on(
         // Schedule for future time
         streamingJob = schedule.scheduleJob(scheduledTime, async () => {
           try {
-            await startStreaming(videoPath, streamKey, duration);
             event.reply('streaming-started');
+            await startStreaming(videoPath, streamKey, duration);
           } catch (error) {
             event.reply('streaming-error', error.message);
           }
@@ -163,5 +167,11 @@ app.on('window-all-closed', () => {
   }
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
   }
 });
