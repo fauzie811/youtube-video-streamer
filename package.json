@@ -1,6 +1,6 @@
 {
   "name": "youtube-video-streamer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A desktop application that allows you to schedule and stream video files to YouTube",
   "author": {
     "name": "Fauzie Rofi",
