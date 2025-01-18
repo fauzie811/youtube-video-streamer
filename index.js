@@ -89,7 +89,13 @@ function startStreaming(videoPath, streamKey, duration, endTime) {
       ])
       .output(streamUrl)
       .on('end', resolve)
-      .on('error', reject);
+      .on('error', (err) => {
+        if (err.message?.includes('SIGKILL')) {
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
 
     currentStream.run();
 
