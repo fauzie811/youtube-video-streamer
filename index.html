@@ -48,7 +48,7 @@
         padding: 6px 8px;
       }
       input[type='time'] {
-        padding: 5px 8px;
+        padding: 5px 8px 4.5px;
       }
       input {
         width: 100%;
@@ -130,11 +130,16 @@
       #statusLight.red {
         background-color: #f44336;
       }
+      .button-group button.selected {
+        background-color: #4caf50;
+        color: white;
+        border-color: #45a049;
+      }
     </style>
   </head>
   <body>
     <div class="form-group">
-      <label>Video Title:</label>
+      <label>Channel / Title:</label>
       <input type="text" id="videoTitle" />
     </div>
 
@@ -157,8 +162,21 @@
     </div>
 
     <div class="form-group">
+      <label>End Type:</label>
+      <div class="button-group">
+        <button id="endByDuration" class="selected">Duration</button>
+        <button id="endByDateTime">Date & Time</button>
+      </div>
+    </div>
+
+    <div class="form-group" id="durationGroup">
       <label>Duration:</label>
       <input type="time" id="duration" value="01:00:00" step="1" />
+    </div>
+
+    <div class="form-group" id="endTimeGroup" style="display: none">
+      <label>End Time:</label>
+      <input type="datetime-local" id="endTime" step="1" />
     </div>
 
     <div class="form-group">
@@ -185,6 +203,7 @@
         streamKey: document.getElementById('streamKey'),
         startTime: document.getElementById('startTime'),
         duration: document.getElementById('duration'),
+        endTime: document.getElementById('endTime'),
         scheduleStream: document.getElementById('scheduleStream'),
       };
 
@@ -242,19 +261,53 @@
         countdownInterval = setInterval(updateTimer, 1000);
       }
 
+      // Add end type selection handling
+      const endByDuration = document.getElementById('endByDuration');
+      const endByDateTime = document.getElementById('endByDateTime');
+      const durationGroup = document.getElementById('durationGroup');
+      const endTimeGroup = document.getElementById('endTimeGroup');
+
+      endByDuration.addEventListener('click', () => {
+        endByDuration.classList.add('selected');
+        endByDateTime.classList.remove('selected');
+        durationGroup.style.display = '';
+        endTimeGroup.style.display = 'none';
+      });
+
+      endByDateTime.addEventListener('click', () => {
+        endByDateTime.classList.add('selected');
+        endByDuration.classList.remove('selected');
+        durationGroup.style.display = 'none';
+        endTimeGroup.style.display = '';
+      });
+
+      // Update the schedule stream click handler
       document
         .getElementById('scheduleStream')
         .addEventListener('click', () => {
           const videoFile = document.getElementById('videoFile').value;
           const streamKey = document.getElementById('streamKey').value;
           const startTime = document.getElementById('startTime').value;
-          const durationStr = document.getElementById('duration').value;
 
-          // Convert HH:mm:ss to seconds
-          const [hours, minutes, seconds] = durationStr.split(':').map(Number);
-          const duration = hours * 3600 + minutes * 60 + (seconds || 0);
+          let duration = null;
+          let endTime = null;
 
-          if (!videoFile || !streamKey || !startTime || !duration) {
+          if (endByDuration.classList.contains('selected')) {
+            const durationStr = document.getElementById('duration').value;
+            const [hours, minutes, seconds] = durationStr
+              .split(':')
+              .map(Number);
+            duration = hours * 3600 + minutes * 60 + (seconds || 0);
+          } else {
+            endTime = document.getElementById('endTime').value;
+          }
+
+          if (
+            !videoFile ||
+            !streamKey ||
+            !startTime ||
+            (!duration && !endTime)
+          ) {
             alert('Please fill in all fields');
             return;
           }
@@ -271,6 +324,7 @@
             streamKey,
             startTime,
             duration,
+            endTime,
           });
 
           document.getElementById('stopStream').disabled = false;

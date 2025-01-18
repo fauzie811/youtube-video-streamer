@@ -24,7 +24,7 @@ const VIDEO_BITRATE = '2000k';
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 640,
-    height: 330,
+    height: 360,
     resizable: false,
     webPreferences: {
       nodeIntegration: true,
@@ -58,11 +58,11 @@ ipcMain.handle('select-video', async () => {
 });
 
 // Start streaming
-function startStreaming(videoPath, streamKey, duration) {
+function startStreaming(videoPath, streamKey, duration, endTime) {
   const streamUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`;
 
   return new Promise((resolve, reject) => {
-    // Verify file exists and is reaadable
+    // Verify file exists and is readable
     try {
       stat(videoPath).catch((error) => {
         reject(new Error('Video file not found or not accessible'));
@@ -102,6 +102,18 @@ function startStreaming(videoPath, streamKey, duration) {
           sendToMainWindow('streaming-stopped');
         }
       }, duration * 1000);
+    } else if (endTime) {
+      const endDateTime = new Date(endTime);
+      const timeUntilEnd = endDateTime.getTime() - Date.now();
+      if (timeUntilEnd > 0) {
+        durationTimeout = setTimeout(() => {
+          if (currentStream) {
+            currentStream.kill();
+            currentStream = null;
+            sendToMainWindow('streaming-stopped');
+          }
+        }, timeUntilEnd);
+      }
     }
   });
 }
@@ -109,7 +121,7 @@ function startStreaming(videoPath, streamKey, duration) {
 // Handle stream scheduling
 ipcMain.on(
   'schedule-stream',
-  async (event, { videoPath, streamKey, startTime, duration }) => {
+  async (event, { videoPath, streamKey, startTime, duration, endTime }) => {
     try {
       const scheduledTime = new Date(startTime);
 
@@ -118,7 +130,7 @@ ipcMain.on(
         // Start streaming immediately
         try {
           event.reply('streaming-started');
-          await startStreaming(videoPath, streamKey, duration);
+          await startStreaming(videoPath, streamKey, duration, endTime);
         } catch (error) {
           event.reply('streaming-error', error.message);
         }
@@ -127,7 +139,7 @@ ipcMain.on(
         streamingJob = schedule.scheduleJob(scheduledTime, async () => {
           try {
             event.reply('streaming-started');
-            await startStreaming(videoPath, streamKey, duration);
+            await startStreaming(videoPath, streamKey, duration, endTime);
           } catch (error) {
             event.reply('streaming-error', error.message);
           }
