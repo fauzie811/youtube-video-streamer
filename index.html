@@ -1,33 +1,28 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>YouTube Video Streamer 1.0.3</title>
+    <title>YouTube Video Streamer 1.0.4</title>
     <style>
-      * {
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
       }
-      html {
+      * {
         margin: 0;
-        padding: 0;
       }
       body {
         font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
           Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue',
           sans-serif;
         font-size: 9pt;
-        margin: 0;
-        padding: 20px;
-        background-color: #f5f5f5;
+        line-height: 1;
+        padding: 10px 10px 25px;
+        background-color: #f0f0f0;
       }
       input,
       button {
-        font-family: inherit;
-        font-size: inherit;
-      }
-      h1 {
-        font-size: inherit;
-        text-align: center;
-        margin-bottom: 20px;
+        font: inherit;
       }
       .form-group {
         margin-bottom: 10px;
@@ -42,10 +37,18 @@
       }
       input,
       button {
-        padding: 8px 10px;
-        border-radius: 4px;
-        border: 1px solid #ddd;
-        transition: all 0.3s ease;
+        color: black;
+      }
+      input {
+        background: white;
+        border: 1px solid #777;
+        padding: 7px 8px;
+      }
+      input[type='datetime-local'] {
+        padding: 6px 8px;
+      }
+      input[type='time'] {
+        padding: 5px 8px;
       }
       input {
         width: 100%;
@@ -53,26 +56,23 @@
       input:focus {
         outline: none;
         border-color: #4caf50;
-        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
       }
       button {
-        background-color: #4caf50;
-        color: white;
-        border-color: transparent;
+        background: #e1e1e1;
+        border: 1px solid #adadad;
+        padding: 8px 10px;
+      }
+      button:focus {
+        outline: none;
+        border-color: #4caf50;
       }
       button:hover {
-        background-color: #45a049;
-        transform: translateY(-1px);
+        background-color: white;
       }
       button:disabled {
         background-color: #cccccc;
-        transform: none;
-      }
-      .note {
-        font-size: 8pt;
-        color: #666;
-        margin-top: 5px;
-        grid-column: 2;
+        border-color: #bbb;
+        color: #999;
       }
       .file-group {
         display: flex;
@@ -101,7 +101,8 @@
       }
       #statusBar {
         align-items: center;
-        border-top: 1px solid #ddd;
+        background-color: #f0f0f0;
+        border-top: 1px solid #ccc;
         display: flex;
         font-size: 8pt;
         gap: 5px;
@@ -132,7 +133,10 @@
     </style>
   </head>
   <body>
-    <!-- <h1>YouTube Video Streamer</h1> -->
+    <div class="form-group">
+      <label>Video Title:</label>
+      <input type="text" id="videoTitle" />
+    </div>
 
     <div class="form-group">
       <label>Video File:</label>
@@ -154,13 +158,7 @@
 
     <div class="form-group">
       <label>Duration:</label>
-      <div>
-        <input type="time" id="duration" value="01:00:00" step="1" />
-        <div class="note">
-          Video will loop until duration is reached or stream is stopped
-          manually
-        </div>
-      </div>
+      <input type="time" id="duration" value="01:00:00" step="1" />
     </div>
 
     <div class="form-group">
@@ -257,7 +255,7 @@
           const duration = hours * 3600 + minutes * 60 + (seconds || 0);
 
           if (!videoFile || !streamKey || !startTime || !duration) {
-            showStatus('Please fill in all fields', 'red');
+            alert('Please fill in all fields');
             return;
           }
 

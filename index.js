@@ -5,6 +5,7 @@ import ffmpegPath from 'ffmpeg-static';
 import schedule from 'node-schedule';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { stat } from 'fs/promises';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +18,8 @@ let mainWindow;
 let streamingJob;
 let currentStream;
 let durationTimeout;
+
+const VIDEO_BITRATE = '2000k';
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -59,6 +62,15 @@ function startStreaming(videoPath, streamKey, duration) {
   const streamUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`;
 
   return new Promise((resolve, reject) => {
+    // Verify file exists and is reaadable
+    try {
+      stat(videoPath).catch((error) => {
+        reject(new Error('Video file not found or not accessible'));
+      });
+    } catch (error) {
+      return;
+    }
+
     currentStream = ffmpeg(videoPath)
       .inputOptions([
         '-stream_loop',
@@ -66,26 +78,14 @@ function startStreaming(videoPath, streamKey, duration) {
         '-re', // Read input at native frame rate
       ])
       .outputOptions([
-        '-c:v',
-        'libx264',
+        '-b:v',
+        VIDEO_BITRATE,
         '-preset',
         'veryfast',
-        '-b:v',
-        '3000k',
-        '-maxrate',
-        '3000k',
-        '-bufsize',
-        '6000k',
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k',
-        '-ar',
-        '44100',
+        '-codec',
+        'copy',
         '-f',
         'flv',
-        '-flvflags',
-        'no_duration_filesize', // Prevent issues with looping
       ])
       .output(streamUrl)
       .on('end', resolve)
@@ -99,7 +99,7 @@ function startStreaming(videoPath, streamKey, duration) {
         if (currentStream) {
           currentStream.kill();
           currentStream = null;
-          mainWindow.webContents.send('streaming-stopped');
+          sendToMainWindow('streaming-stopped');
         }
       }, duration * 1000);
     }
@@ -154,7 +154,7 @@ ipcMain.on('stop-stream', () => {
     streamingJob.cancel();
     streamingJob = null;
   }
-  mainWindow.webContents.send('streaming-stopped');
+  sendToMainWindow('streaming-stopped');
 });
 
 // Cleanup on exit
@@ -175,3 +175,9 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+function sendToMainWindow(channel, ...args) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, ...args);
+  }
+}
