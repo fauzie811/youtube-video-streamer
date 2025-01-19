@@ -1,0 +1,39 @@
+appId: com.youtubevideostreamer.app
+productName: 'YouTube Video Streamer'
+electronLanguages:
+  - en-US
+  - id
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+asarUnpack:
+  - resources/**
+mac:
+  category: public.app-category.video
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+linux:
+  target:
+    - AppImage
+    - deb
+    - rpm
+  category: Video
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
