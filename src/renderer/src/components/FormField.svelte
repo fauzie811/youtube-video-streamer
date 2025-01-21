@@ -1,23 +1,30 @@
 <script>
-  export let label = ''
-  export let id = ''
+  /**
+   * @typedef {Object} Props
+   * @property {string} [label]
+   * @property {string} [id]
+   * @property {import('svelte').Snippet} [children]
+   */
+
+  /** @type {Props} */
+  let { label = '', id = '', children } = $props()
 </script>
 
 <div class="form-group">
   <label for={id}>{label}</label>
-  <slot />
+  {@render children?.()}
 </div>
 
 <style>
   .form-group {
     margin-bottom: 10px;
     display: grid;
-    grid-template-columns: 120px 1fr;
+    grid-template-columns: 1fr 3fr;
     align-items: start;
     gap: 10px;
   }
   label {
-    margin: 8px 0;
+    margin: 4px 0;
     text-align: right;
   }
 </style>

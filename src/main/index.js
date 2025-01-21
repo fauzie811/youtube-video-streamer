@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { setupTitlebar, attachTitlebarToWindow } from 'custom-electron-titlebar/main'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegPath from 'ffmpeg-static'
 import schedule from 'node-schedule'
@@ -16,19 +17,24 @@ const __dirname = dirname(__filename)
 ffmpeg.setFfmpegPath(ffmpegPath.replace('app.asar', 'app.asar.unpacked'))
 
 let mainWindow
-let streamingJob
-let currentStream
-let durationTimeout
 
 const VIDEO_BITRATE = '2000k'
+
+// Modify the stream tracking to handle multiple streams
+const streams = new Map()
+
+setupTitlebar()
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 640,
     height: 360,
-    resizable: false,
+    minWidth: 640,
+    minHeight: 360,
     show: false,
     autoHideMenuBar: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -52,6 +58,8 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  attachTitlebarToWindow(mainWindow)
 }
 
 // This method will be called when Electron has finished
@@ -78,11 +86,20 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  if (durationTimeout) clearTimeout(durationTimeout)
-  if (currentStream) currentStream.kill()
-  // Quit when all windows are closed, except on macOS. There, it's common
-  // for applications and their menu bar to stay active until the user quits
-  // explicitly with Cmd + Q.
+  // Stop all streams
+  for (const [_, streamData] of streams) {
+    if (streamData.durationTimeout) {
+      clearTimeout(streamData.durationTimeout)
+    }
+    if (streamData.stream) {
+      streamData.stream.kill()
+    }
+    if (streamData.scheduledJob) {
+      streamData.scheduledJob.cancel()
+    }
+  }
+  streams.clear()
+
   if (process.platform !== 'darwin') {
     app.quit()
   }
@@ -106,11 +123,10 @@ ipcMain.handle('select-video', async () => {
 })
 
 // Start streaming
-function startStreaming(videoPath, streamKey, duration, endTime) {
+function startStreaming(streamId, videoPath, streamKey, duration, endTime) {
   const streamUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`
 
   return new Promise((resolve, reject) => {
-    // Verify file exists and is readable
     try {
       stat(videoPath).catch(() => {
         reject(new Error('Video file not found or not accessible'))
@@ -119,45 +135,57 @@ function startStreaming(videoPath, streamKey, duration, endTime) {
       return
     }
 
-    currentStream = ffmpeg(videoPath)
-      .inputOptions([
-        '-stream_loop',
-        '-1', // Loop input indefinitely
-        '-re' // Read input at native frame rate
-      ])
+    const stream = ffmpeg(videoPath)
+      .inputOptions(['-stream_loop', '-1', '-re'])
       .outputOptions(['-b:v', VIDEO_BITRATE, '-preset', 'veryfast', '-codec', 'copy', '-f', 'flv'])
       .output(streamUrl)
-      .on('end', resolve)
+      .on('end', () => {
+        streams.delete(streamId)
+        resolve()
+      })
       .on('error', (err) => {
         if (err.message?.includes('SIGKILL')) {
+          streams.delete(streamId)
           resolve()
         } else {
           reject(err)
         }
       })
 
-    currentStream.run()
+    stream.run()
 
-    // Set up duration timeout if specified
+    // Store stream information
+    streams.set(streamId, {
+      stream,
+      durationTimeout: null
+    })
+
+    // Handle duration/end time
     if (duration) {
-      durationTimeout = setTimeout(() => {
-        if (currentStream) {
-          currentStream.kill()
-          currentStream = null
-          sendToMainWindow('streaming-stopped')
+      const timeout = setTimeout(() => {
+        const streamData = streams.get(streamId)
+        if (streamData) {
+          streamData.stream.kill()
+          streams.delete(streamId)
+          sendToMainWindow('streaming-stopped', streamId)
         }
       }, duration * 1000)
+
+      streams.get(streamId).durationTimeout = timeout
     } else if (endTime) {
       const endDateTime = new Date(endTime)
       const timeUntilEnd = endDateTime.getTime() - Date.now()
       if (timeUntilEnd > 0) {
-        durationTimeout = setTimeout(() => {
-          if (currentStream) {
-            currentStream.kill()
-            currentStream = null
-            sendToMainWindow('streaming-stopped')
+        const timeout = setTimeout(() => {
+          const streamData = streams.get(streamId)
+          if (streamData) {
+            streamData.stream.kill()
+            streams.delete(streamId)
+            sendToMainWindow('streaming-stopped', streamId)
           }
         }, timeUntilEnd)
+
+        streams.get(streamId).durationTimeout = timeout
       }
     }
   })
@@ -166,50 +194,53 @@ function startStreaming(videoPath, streamKey, duration, endTime) {
 // Handle stream scheduling
 ipcMain.on(
   'schedule-stream',
-  async (event, { videoPath, streamKey, startTime, duration, endTime }) => {
+  async (event, { streamId, videoPath, streamKey, startTime, duration, endTime }) => {
     try {
       const scheduledTime = new Date(startTime)
 
-      // Check if scheduled time is in the past
       if (scheduledTime < new Date()) {
-        // Start streaming immediately
         try {
-          event.reply('streaming-started')
-          await startStreaming(videoPath, streamKey, duration, endTime)
+          event.reply('streaming-started', streamId)
+          await startStreaming(streamId, videoPath, streamKey, duration, endTime)
         } catch (error) {
-          event.reply('streaming-error', error.message)
+          event.reply('streaming-error', { streamId, message: error.message })
         }
       } else {
-        // Schedule for future time
-        streamingJob = schedule.scheduleJob(scheduledTime, async () => {
+        const job = schedule.scheduleJob(scheduledTime, async () => {
           try {
-            event.reply('streaming-started')
-            await startStreaming(videoPath, streamKey, duration, endTime)
+            event.reply('streaming-started', streamId)
+            await startStreaming(streamId, videoPath, streamKey, duration, endTime)
           } catch (error) {
-            event.reply('streaming-error', error.message)
+            event.reply('streaming-error', { streamId, message: error.message })
           }
         })
-        event.reply('stream-scheduled')
+
+        streams.set(streamId, { scheduledJob: job })
+        event.reply('stream-scheduled', streamId)
       }
     } catch (error) {
-      event.reply('scheduling-error', error.message)
+      event.reply('scheduling-error', { streamId, message: error.message })
     }
   }
 )
 
 // Stop streaming
-ipcMain.on('stop-stream', () => {
-  if (durationTimeout) {
-    clearTimeout(durationTimeout)
-    durationTimeout = null
+ipcMain.on('stop-stream', (event, streamId) => {
+  const streamData = streams.get(streamId)
+  if (!streamData) return
+
+  if (streamData.durationTimeout) {
+    clearTimeout(streamData.durationTimeout)
   }
-  if (currentStream) {
-    currentStream.kill()
-    currentStream = null
+
+  if (streamData.stream) {
+    streamData.stream.kill()
   }
-  if (streamingJob) {
-    streamingJob.cancel()
-    streamingJob = null
+
+  if (streamData.scheduledJob) {
+    streamData.scheduledJob.cancel()
   }
-  sendToMainWindow('streaming-stopped')
+
+  streams.delete(streamId)
+  sendToMainWindow('streaming-stopped', streamId)
 })

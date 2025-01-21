@@ -1,7 +1,14 @@
 <script>
-  export let disabled = false
-  export let variant = 'default' // default, stop, selected
-  export let type = 'button'
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [disabled]
+   * @property {string} [variant] - default, stop, selected
+   * @property {string} [type]
+   * @property {import('svelte').Snippet} [children]
+   */
+
+  /** @type {Props} */
+  let { disabled = false, variant = 'default', type = 'button', onclick, children } = $props()
 </script>
 
 <button
@@ -9,25 +16,33 @@
   {disabled}
   class:selected={variant === 'selected'}
   class:stop={variant === 'stop'}
-  on:click
+  {onclick}
 >
-  <slot />
+  {@render children?.()}
 </button>
 
 <style>
   button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font: inherit;
     color: black;
     background: #e1e1e1;
-    border: 1px solid #adadad;
-    padding: 8px 10px;
+    border: 1px solid #aaa;
+    border-radius: 2px;
+    padding: 5px 10px;
+    text-align: center;
   }
   button:focus {
     outline: none;
     border-color: #4caf50;
   }
   button:hover {
-    background-color: white;
+    background-color: #ddd;
+  }
+  button:active {
+    background-color: #ccc;
   }
   button:disabled {
     background-color: #cccccc;

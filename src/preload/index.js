@@ -1,5 +1,6 @@
 import { contextBridge } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { Titlebar } from 'custom-electron-titlebar'
 
 // Custom APIs for renderer
 const api = {}
@@ -18,3 +19,8 @@ if (process.contextIsolated) {
   window.electron = electronAPI
   window.api = api
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Title bar implementation
+  new Titlebar()
+})

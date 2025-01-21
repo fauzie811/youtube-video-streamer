@@ -1,11 +1,16 @@
 <script>
-  export let statusText = 'Ready'
-  export let statusColor = 'gray'
+  /**
+   * @typedef {Object} Props
+   * @property {Object} [stream]
+   */
+
+  /** @type {Props} */
+  let { stream = null } = $props()
 </script>
 
 <div id="statusBar">
-  <div id="statusLight" class={statusColor} />
-  <div id="statusText">{statusText}</div>
+  <div id="statusLight" class={stream.status}></div>
+  <div id="statusText">{stream.statusText}</div>
 </div>
 
 <style>
@@ -20,24 +25,24 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 25px;
+    height: 22px;
     padding: 0 5px;
   }
   #statusLight {
     border-radius: 50%;
-    width: 15px;
-    height: 15px;
+    width: 12px;
+    height: 12px;
   }
-  #statusLight.gray {
-    background-color: #9e9e9e;
+  #statusLight.ready {
+    background-color: var(--color-ready);
   }
-  #statusLight.yellow {
-    background-color: #ffc107;
+  #statusLight.scheduled {
+    background-color: var(--color-scheduled);
   }
-  #statusLight.green {
-    background-color: #4caf50;
+  #statusLight.streaming {
+    background-color: var(--color-streaming);
   }
-  #statusLight.red {
-    background-color: #f44336;
+  #statusLight.error {
+    background-color: var(--color-error);
   }
 </style>
