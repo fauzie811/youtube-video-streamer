@@ -36,7 +36,7 @@
 
 <style>
   .list {
-    background: white;
+    background: var(--input-background);
     list-style: none;
     padding: 0;
     overflow-y: auto;

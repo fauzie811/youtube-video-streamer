@@ -3,14 +3,15 @@
    * @typedef {Object} Props
    * @property {boolean} [disabled]
    * @property {string} [type]
+   * @property {string} [title]
    * @property {import('svelte').Snippet} [children]
    */
 
   /** @type {Props} */
-  let { disabled = false, type = 'button', onclick, children } = $props()
+  let { disabled = false, type = 'button', title, onclick, children } = $props()
 </script>
 
-<button {type} {disabled} {onclick}>
+<button {type} {title} {disabled} {onclick}>
   {@render children?.()}
 </button>
 
@@ -20,7 +21,6 @@
     align-items: center;
     justify-content: center;
     font: inherit;
-    color: black;
     background: transparent;
     border: none;
     border-radius: 2px;

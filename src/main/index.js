@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { setupTitlebar, attachTitlebarToWindow } from 'custom-electron-titlebar/main'
+// import { setupTitlebar, attachTitlebarToWindow } from 'custom-electron-titlebar/main'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegPath from 'ffmpeg-static'
 import schedule from 'node-schedule'
@@ -23,7 +23,7 @@ const VIDEO_BITRATE = '2000k'
 // Modify the stream tracking to handle multiple streams
 const streams = new Map()
 
-setupTitlebar()
+// setupTitlebar()
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -33,8 +33,8 @@ function createWindow() {
     minHeight: 360,
     show: false,
     autoHideMenuBar: true,
-    titleBarStyle: 'hidden',
-    titleBarOverlay: true,
+    // titleBarStyle: 'hidden',
+    // titleBarOverlay: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -44,6 +44,29 @@ function createWindow() {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  mainWindow.on('close', async (event) => {
+    // Check if there are any active or scheduled streams
+    const hasActiveStreams = Array.from(streams.values()).some(
+      (streamData) => streamData.stream || streamData.scheduledJob
+    )
+
+    if (hasActiveStreams) {
+      event.preventDefault()
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        buttons: ['Yes', 'No'],
+        title: 'Confirm Close',
+        message:
+          'There are active or scheduled streams. Are you sure you want to close the application?'
+      })
+
+      if (response === 0) {
+        // Yes
+        mainWindow.destroy()
+      }
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -59,7 +82,7 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  attachTitlebarToWindow(mainWindow)
+  // attachTitlebarToWindow(mainWindow)
 }
 
 // This method will be called when Electron has finished
@@ -87,7 +110,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   // Stop all streams
-  for (const [_, streamData] of streams) {
+  for (const [, streamData] of streams) {
     if (streamData.durationTimeout) {
       clearTimeout(streamData.durationTimeout)
     }

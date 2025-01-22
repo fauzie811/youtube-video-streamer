@@ -112,19 +112,13 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <p>Streams</p>
-      <IconButton onclick={createNewStream}>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+      <IconButton onclick={createNewStream} title="Add Stream">
+        <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+          ><path
+            d="M11.75 3a.75.75 0 0 1 .743.648l.007.102.001 7.25h7.253a.75.75 0 0 1 .102 1.493l-.102.007h-7.253l.002 7.25a.75.75 0 0 1-1.493.101l-.007-.102-.002-7.249H3.752a.75.75 0 0 1-.102-1.493L3.752 11h7.25L11 3.75a.75.75 0 0 1 .75-.75Z"
+            fill="currentColor"
+          /></svg
         >
-          <path
-            d="M11.2502 6C11.2502 5.58579 11.586 5.25 12.0002 5.25C12.4145 5.25 12.7502 5.58579 12.7502 6V11.2502H18.0007C18.4149 11.2502 18.7507 11.586 18.7507 12.0002C18.7507 12.4145 18.4149 12.7502 18.0007 12.7502H12.7502V18.0007C12.7502 18.4149 12.4145 18.7507 12.0002 18.7507C11.586 18.7507 11.2502 18.4149 11.2502 18.0007V12.7502H6C5.58579 12.7502 5.25 12.4145 5.25 12.0002C5.25 11.586 5.58579 11.2502 6 11.2502H11.2502V6Z"
-            fill="#323544"
-          />
-        </svg>
       </IconButton>
     </div>
     <ListView
@@ -280,14 +274,14 @@
           </Button>
         </div>
       </FormField>
-
-      <StatusBar stream={selectedStream} />
     {:else}
       <div class="no-stream-selected">
         <p>Select a stream from the sidebar or create a new one</p>
       </div>
     {/if}
   </div>
+
+  <StatusBar stream={selectedStream} />
 </div>
 
 <style>
@@ -312,18 +306,18 @@
   }
   .app-container {
     display: flex;
-    height: 100vh;
+    height: calc(100vh - 22px);
     overflow: hidden;
   }
   .sidebar {
     width: clamp(200px, 30vw, 300px);
-    border-right: 1px solid #ccc;
+    border-right: 1px solid var(--divider);
     display: flex;
     flex-direction: column;
   }
   .sidebar-header {
     padding: 2px 2px 2px 10px;
-    border-bottom: 1px solid #ccc;
+    border-bottom: 1px solid var(--divider);
     display: flex;
     justify-content: space-between;
     align-items: center;

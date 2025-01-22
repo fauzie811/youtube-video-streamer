@@ -9,15 +9,16 @@
 </script>
 
 <div id="statusBar">
-  <div id="statusLight" class={stream.status}></div>
-  <div id="statusText">{stream.statusText}</div>
+  {#if stream}
+    <div id="statusLight" class={stream.status}></div>
+    <div id="statusText">{stream.statusText}</div>
+  {/if}
 </div>
 
 <style>
   #statusBar {
     align-items: center;
-    background-color: #f0f0f0;
-    border-top: 1px solid #ccc;
+    border-top: 1px solid var(--divider);
     display: flex;
     font-size: 8pt;
     gap: 5px;

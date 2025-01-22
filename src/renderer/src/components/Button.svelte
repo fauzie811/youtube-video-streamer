@@ -39,7 +39,7 @@
     border-color: #4caf50;
   }
   button:hover {
-    background-color: #ddd;
+    background-color: #dadada;
   }
   button:active {
     background-color: #ccc;
@@ -54,9 +54,10 @@
     color: white;
     border-color: #45a049;
   }
-  button.stop {
+  button.stop:not(:disabled) {
     background-color: #f44336;
     color: white;
+    border-color: #d32f2f;
   }
   button.stop:hover {
     background-color: #e53935;
