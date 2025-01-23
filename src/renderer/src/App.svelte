@@ -1,11 +1,11 @@
 <script>
-  import FormField from './components/FormField.svelte'
+  import { SplitPane } from '@rich_harris/svelte-split-pane'
   import StatusBar from './components/StatusBar.svelte'
-  import Button from './components/Button.svelte'
   import ListView from './components/ListView.svelte'
   import StreamListItem from './components/StreamListItem.svelte'
   import IconButton from './components/IconButton.svelte'
   import streams from './stores/streams'
+  import StreamForm from './partials/StreamForm.svelte'
 
   let selectedStreamId = $state(null)
 
@@ -109,209 +109,59 @@
 </script>
 
 <div class="app-container">
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <p>Streams</p>
-      <IconButton onclick={createNewStream} title="Add Stream">
-        <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-          ><path
-            d="M11.75 3a.75.75 0 0 1 .743.648l.007.102.001 7.25h7.253a.75.75 0 0 1 .102 1.493l-.102.007h-7.253l.002 7.25a.75.75 0 0 1-1.493.101l-.007-.102-.002-7.249H3.752a.75.75 0 0 1-.102-1.493L3.752 11h7.25L11 3.75a.75.75 0 0 1 .75-.75Z"
-            fill="currentColor"
-          /></svg
+  <SplitPane type="horizontal" min="200px" max="50%" pos="30%" --color="#ccc">
+    {#snippet a()}
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <p>Streams</p>
+          <IconButton onclick={createNewStream} title="Add Stream">
+            <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+              ><path
+                d="M11.75 3a.75.75 0 0 1 .743.648l.007.102.001 7.25h7.253a.75.75 0 0 1 .102 1.493l-.102.007h-7.253l.002 7.25a.75.75 0 0 1-1.493.101l-.007-.102-.002-7.249H3.752a.75.75 0 0 1-.102-1.493L3.752 11h7.25L11 3.75a.75.75 0 0 1 .75-.75Z"
+                fill="currentColor"
+              /></svg
+            >
+          </IconButton>
+        </div>
+        <ListView
+          class="streams-list"
+          items={$streams}
+          onitemclick={(item) => (selectedStreamId = item.id)}
         >
-      </IconButton>
-    </div>
-    <ListView
-      class="streams-list"
-      items={$streams}
-      onitemclick={(item) => (selectedStreamId = item.id)}
-    >
-      {#snippet listItem(item)}
-        <StreamListItem
-          stream={item}
-          selected={selectedStreamId === item.id}
-          ondelete={() => deleteStream(item.id)}
-        />
-      {/snippet}
-    </ListView>
-  </div>
-
-  <div class="main-content">
-    {#if selectedStream}
-      <FormField label="Channel / Title:" id="videoTitle">
-        <input
-          type="text"
-          id="videoTitle"
-          value={selectedStream.videoTitle}
-          disabled={selectedStream.status !== 'ready'}
-          oninput={(e) => {
-            $streams = $streams.map((s) =>
-              s.id === selectedStream.id ? { ...s, videoTitle: e.target.value } : s
-            )
-          }}
-        />
-      </FormField>
-
-      <FormField label="Video File:" id="videoFile">
-        <div class="file-group">
-          <input
-            type="text"
-            id="videoFile"
-            value={selectedStream.videoFile}
-            disabled={selectedStream.status !== 'ready'}
-            oninput={(e) => {
-              $streams = $streams.map((s) =>
-                s.id === selectedStream.id ? { ...s, videoFile: e.target.value } : s
-              )
-            }}
-          />
-          <Button onclick={selectVideo} disabled={selectedStream.status !== 'ready'}>Browse</Button>
-        </div>
-      </FormField>
-
-      <FormField label="Stream Key:" id="streamKey">
-        <input
-          type="text"
-          id="streamKey"
-          value={selectedStream.streamKey}
-          disabled={selectedStream.status !== 'ready'}
-          oninput={(e) => {
-            $streams = $streams.map((s) =>
-              s.id === selectedStream.id ? { ...s, streamKey: e.target.value } : s
-            )
-          }}
-        />
-      </FormField>
-
-      <FormField label="Start Time:" id="startTime">
-        <input
-          type="datetime-local"
-          id="startTime"
-          value={selectedStream.startTime}
-          step="1"
-          disabled={selectedStream.status !== 'ready'}
-          oninput={(e) => {
-            $streams = $streams.map((s) =>
-              s.id === selectedStream.id ? { ...s, startTime: e.target.value } : s
-            )
-          }}
-        />
-      </FormField>
-
-      <FormField label="End Type:" id="endType">
-        <div class="button-group">
-          <Button
-            variant={selectedStream.isEndByDuration ? 'selected' : 'default'}
-            onclick={() => {
-              $streams = $streams.map((s) =>
-                s.id === selectedStream.id ? { ...s, isEndByDuration: true } : s
-              )
-            }}
-            disabled={selectedStream.status !== 'ready'}
-          >
-            Duration
-          </Button>
-          <Button
-            variant={!selectedStream.isEndByDuration ? 'selected' : 'default'}
-            onclick={() => {
-              $streams = $streams.map((s) =>
-                s.id === selectedStream.id ? { ...s, isEndByDuration: false } : s
-              )
-            }}
-            disabled={selectedStream.status !== 'ready'}
-          >
-            Date & Time
-          </Button>
-        </div>
-      </FormField>
-
-      {#if selectedStream.isEndByDuration}
-        <FormField label="Duration:" id="duration">
-          <input
-            type="time"
-            id="duration"
-            value={selectedStream.duration}
-            step="1"
-            disabled={selectedStream.status !== 'ready'}
-            oninput={(e) => {
-              $streams = $streams.map((s) =>
-                s.id === selectedStream.id ? { ...s, duration: e.target.value } : s
-              )
-            }}
-          />
-        </FormField>
-      {:else}
-        <FormField label="End Time:" id="endTime">
-          <input
-            type="datetime-local"
-            id="endTime"
-            value={selectedStream.endTime}
-            step="1"
-            disabled={selectedStream.status !== 'ready'}
-            oninput={(e) => {
-              $streams = $streams.map((s) =>
-                s.id === selectedStream.id ? { ...s, endTime: e.target.value } : s
-              )
-            }}
-          />
-        </FormField>
-      {/if}
-
-      <FormField label=" ">
-        <div class="button-group">
-          <Button
-            onclick={() => scheduleStream(selectedStream.id)}
-            disabled={selectedStream.status !== 'ready'}
-          >
-            Start / Schedule
-          </Button>
-          <Button
-            variant="stop"
-            onclick={() => stopStream(selectedStream.id)}
-            disabled={selectedStream.status === 'ready'}
-          >
-            Stop
-          </Button>
-        </div>
-      </FormField>
-    {:else}
-      <div class="no-stream-selected">
-        <p>Select a stream from the sidebar or create a new one</p>
+          {#snippet listItem(item)}
+            <StreamListItem
+              stream={item}
+              selected={selectedStreamId === item.id}
+              ondelete={() => deleteStream(item.id)}
+            />
+          {/snippet}
+        </ListView>
       </div>
-    {/if}
-  </div>
+    {/snippet}
+
+    {#snippet b()}
+      <div class="main-content">
+        {#if selectedStream}
+          <StreamForm stream={selectedStream} {selectVideo} {scheduleStream} {stopStream} />
+        {:else}
+          <div class="no-stream-selected">
+            <p>Select a stream from the sidebar or create a new one</p>
+          </div>
+        {/if}
+      </div>
+    {/snippet}
+  </SplitPane>
 
   <StatusBar stream={selectedStream} />
 </div>
 
 <style>
-  input {
-    width: 100%;
-  }
-  .file-group {
-    display: flex;
-    align-items: start;
-    gap: 10px;
-  }
-  .file-group input {
-    flex-grow: 1;
-  }
-  .button-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .button-group :global(button) {
-    margin: 0;
-  }
   .app-container {
     display: flex;
-    height: calc(100vh - 22px);
-    overflow: hidden;
+    flex-direction: column;
+    height: 100vh;
   }
   .sidebar {
-    width: clamp(200px, 30vw, 300px);
-    border-right: 1px solid var(--divider);
     display: flex;
     flex-direction: column;
   }
@@ -331,7 +181,6 @@
     flex-grow: 1;
   }
   .main-content {
-    flex-grow: 1;
     padding: 10px;
     overflow-y: auto;
   }

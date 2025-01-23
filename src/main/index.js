@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeTheme } from 'electron'
 // import { setupTitlebar, attachTitlebarToWindow } from 'custom-electron-titlebar/main'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegPath from 'ffmpeg-static'
@@ -15,6 +15,23 @@ const __dirname = dirname(__filename)
 
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegPath.replace('app.asar', 'app.asar.unpacked'))
+
+nativeTheme.themeSource = 'light'
+
+// Prevent multiple instances of the app
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+}
 
 let mainWindow
 
@@ -70,7 +87,9 @@ function createWindow() {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    if (details.url.startsWith('http://') || details.url.startsWith('https://')) {
+      shell.openExternal(details.url)
+    }
     return { action: 'deny' }
   })
 

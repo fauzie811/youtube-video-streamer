@@ -22,10 +22,6 @@
     display: flex;
     font-size: 8pt;
     gap: 5px;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
     height: 22px;
     padding: 0 5px;
   }

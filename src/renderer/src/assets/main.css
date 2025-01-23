@@ -54,31 +54,36 @@ body {
   color: var(--text-color);
 }
 
+:not(input):not(textarea),
+:not(input):not(textarea)::after,
+:not(input):not(textarea)::before {
+  user-select: none;
+  cursor: default;
+}
+
 input,
 button {
+  color: inherit;
   font: inherit;
 }
-input,
-button {
-  color: var(--text-color);
-}
-input {
+input[type='text'],
+input[type='datetime-local'],
+input[type='time'] {
   background: var(--input-background);
   border: 1px solid var(--input-border);
   border-radius: 2px;
-  padding: 4px 8px;
+  padding: 0 8px;
+  height: 24px;
 }
-input[type='datetime-local'] {
-  padding: 3px 8px;
-}
-input[type='time'] {
-  padding: 2px 8px 1.5px;
-}
-input:focus-visible {
+input[type='text']:focus-visible,
+input[type='datetime-local']:focus-visible,
+input[type='time']:focus-visible {
   outline: none;
   border-color: var(--color-accent);
 }
-input:disabled {
+input[type='text']:disabled,
+input[type='datetime-local']:disabled,
+input[type='time']:disabled {
   color: #999;
 }
 
