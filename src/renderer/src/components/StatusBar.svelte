@@ -6,12 +6,21 @@
 
   /** @type {Props} */
   let { stream = null } = $props()
+
+  function copyText() {
+    window.api.clipboard.writeText(stream.statusText)
+    alert('Message copied to clipboard.')
+  }
 </script>
 
 <div id="statusBar">
   {#if stream}
     <div id="statusLight" class={stream.status}></div>
-    <div id="statusText">{stream.statusText}</div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div id="statusText" onclick={copyText}>
+      {stream.statusText}
+    </div>
   {/if}
 </div>
 
@@ -27,6 +36,7 @@
   }
   #statusLight {
     border-radius: 50%;
+    flex-shrink: 0;
     width: 12px;
     height: 12px;
   }
@@ -41,5 +51,12 @@
   }
   #statusLight.error {
     background-color: var(--color-error);
+  }
+  #statusText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
   }
 </style>

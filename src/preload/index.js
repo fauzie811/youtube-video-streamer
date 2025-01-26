@@ -1,9 +1,9 @@
-import { contextBridge } from 'electron'
+import { contextBridge, clipboard } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 // import { Titlebar } from 'custom-electron-titlebar'
 
 // Custom APIs for renderer
-const api = {}
+const api = { clipboard }
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
