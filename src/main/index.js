@@ -1,5 +1,4 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, nativeTheme } from 'electron'
-// import { setupTitlebar, attachTitlebarToWindow } from 'custom-electron-titlebar/main'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegPath from 'ffmpeg-static'
 import schedule from 'node-schedule'
@@ -18,25 +17,161 @@ ffmpeg.setFfmpegPath(ffmpegPath.replace('app.asar', 'app.asar.unpacked'))
 
 nativeTheme.themeSource = 'light'
 
-let mainWindow
-
 const VIDEO_BITRATE = '2000k'
 
-// Modify the stream tracking to handle multiple streams
-const streams = new Map()
+class StreamManager {
+  constructor() {
+    this.streams = new Map()
+    this.mainWindow = null
+  }
 
-// setupTitlebar()
+  setMainWindow(window) {
+    this.mainWindow = window
+  }
+
+  sendToMainWindow(channel, ...args) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send(channel, ...args)
+    }
+  }
+
+  hasActiveStreams() {
+    return Array.from(this.streams.values()).some(
+      (streamData) => streamData.stream || streamData.scheduledJob
+    )
+  }
+
+  cleanupStream(streamId) {
+    const streamData = this.streams.get(streamId)
+    if (!streamData) return false
+
+    if (streamData.stopJob) {
+      streamData.stopJob.cancel()
+    }
+
+    if (streamData.stream) {
+      streamData.stream.kill()
+    }
+
+    if (streamData.scheduledJob) {
+      streamData.scheduledJob.cancel()
+    }
+
+    this.streams.delete(streamId)
+    return true
+  }
+
+  cleanupAllStreams() {
+    for (const [streamId] of this.streams) {
+      this.cleanupStream(streamId)
+    }
+    this.streams.clear()
+  }
+
+  createFFmpegStream(videoPath, streamKey) {
+    const streamUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`
+    return ffmpeg(videoPath)
+      .inputOptions(['-stream_loop', '-1', '-re'])
+      .outputOptions(['-b:v', VIDEO_BITRATE, '-preset', 'veryfast', '-codec', 'copy', '-f', 'flv'])
+      .output(streamUrl)
+  }
+
+  setupStreamEndJob(streamId, endTime) {
+    const endDateTime = new Date(endTime)
+    if (endDateTime > new Date()) {
+      const stopJob = schedule.scheduleJob(endDateTime, () => {
+        if (this.cleanupStream(streamId)) {
+          this.sendToMainWindow('streaming-stopped', streamId)
+        }
+      })
+      const streamData = this.streams.get(streamId)
+      if (streamData) {
+        streamData.stopJob = stopJob
+      }
+    }
+  }
+
+  async startStreaming(streamId, videoPath, streamKey, duration, endTime) {
+    try {
+      await stat(videoPath)
+    } catch (error) {
+      throw new Error('Video file not found or not accessible')
+    }
+
+    return new Promise((resolve, reject) => {
+      const stream = this.createFFmpegStream(videoPath, streamKey)
+        .on('end', () => {
+          this.streams.delete(streamId)
+          resolve()
+        })
+        .on('error', (err) => {
+          if (err.message?.includes('SIGKILL')) {
+            this.streams.delete(streamId)
+            resolve()
+          } else {
+            reject(err)
+          }
+        })
+
+      stream.run()
+
+      this.streams.set(streamId, {
+        stream,
+        stopJob: null
+      })
+
+      if (duration) {
+        const endDate = new Date(Date.now() + duration * 1000)
+        this.setupStreamEndJob(streamId, endDate)
+      } else if (endTime) {
+        this.setupStreamEndJob(streamId, endTime)
+      }
+    })
+  }
+
+  async handleStreamScheduling(
+    event,
+    { streamId, videoPath, streamKey, startTime, duration, endTime }
+  ) {
+    try {
+      const scheduledTime = new Date(startTime)
+
+      if (scheduledTime < new Date()) {
+        try {
+          event.reply('streaming-started', streamId)
+          await this.startStreaming(streamId, videoPath, streamKey, duration, endTime)
+        } catch (error) {
+          event.reply('streaming-error', { streamId, message: error.message })
+        }
+      } else {
+        const job = schedule.scheduleJob(scheduledTime, async () => {
+          try {
+            event.reply('streaming-started', streamId)
+            await this.startStreaming(streamId, videoPath, streamKey, duration, endTime)
+          } catch (error) {
+            event.reply('streaming-error', { streamId, message: error.message })
+          }
+        })
+
+        this.streams.set(streamId, { scheduledJob: job })
+        event.reply('stream-scheduled', streamId)
+      }
+    } catch (error) {
+      event.reply('scheduling-error', { streamId, message: error.message })
+    }
+  }
+}
+
+const streamManager = new StreamManager()
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  const mainWindow = new BrowserWindow({
     width: 640,
     height: 360,
     minWidth: 640,
     minHeight: 360,
     show: false,
     autoHideMenuBar: true,
-    // titleBarStyle: 'hidden',
-    // titleBarOverlay: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -44,17 +179,14 @@ function createWindow() {
     }
   })
 
+  streamManager.setMainWindow(mainWindow)
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
 
   mainWindow.on('close', async (event) => {
-    // Check if there are any active or scheduled streams
-    const hasActiveStreams = Array.from(streams.values()).some(
-      (streamData) => streamData.stream || streamData.scheduledJob
-    )
-
-    if (hasActiveStreams) {
+    if (streamManager.hasActiveStreams()) {
       event.preventDefault()
       const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'question',
@@ -65,7 +197,6 @@ function createWindow() {
       })
 
       if (response === 0) {
-        // Yes
         mainWindow.destroy()
       }
     }
@@ -78,68 +209,39 @@ function createWindow() {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  // attachTitlebarToWindow(mainWindow)
+  return mainWindow
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.youtubevideostreamer')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
   createWindow()
 
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('window-all-closed', () => {
-  // Stop all streams
-  for (const [, streamData] of streams) {
-    if (streamData.durationTimeout) {
-      clearTimeout(streamData.durationTimeout)
-    }
-    if (streamData.stream) {
-      streamData.stream.kill()
-    }
-    if (streamData.scheduledJob) {
-      streamData.scheduledJob.cancel()
-    }
-  }
-  streams.clear()
-
+  streamManager.cleanupAllStreams()
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
-function sendToMainWindow(channel, ...args) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(channel, ...args)
-  }
-}
-// Handle file selection
+// IPC Handlers
 ipcMain.handle('select-video', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
     properties: ['openFile'],
     filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mkv'] }]
   })
@@ -149,125 +251,12 @@ ipcMain.handle('select-video', async () => {
   }
 })
 
-// Start streaming
-function startStreaming(streamId, videoPath, streamKey, duration, endTime) {
-  const streamUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`
+ipcMain.on('schedule-stream', (event, streamOptions) => {
+  streamManager.handleStreamScheduling(event, streamOptions)
+})
 
-  return new Promise((resolve, reject) => {
-    try {
-      stat(videoPath).catch(() => {
-        reject(new Error('Video file not found or not accessible'))
-      })
-    } catch (error) {
-      return
-    }
-
-    const stream = ffmpeg(videoPath)
-      .inputOptions(['-stream_loop', '-1', '-re'])
-      .outputOptions(['-b:v', VIDEO_BITRATE, '-preset', 'veryfast', '-codec', 'copy', '-f', 'flv'])
-      .output(streamUrl)
-      .on('end', () => {
-        streams.delete(streamId)
-        resolve()
-      })
-      .on('error', (err) => {
-        if (err.message?.includes('SIGKILL')) {
-          streams.delete(streamId)
-          resolve()
-        } else {
-          reject(err)
-        }
-      })
-
-    stream.run()
-
-    // Store stream information
-    streams.set(streamId, {
-      stream,
-      durationTimeout: null
-    })
-
-    // Handle duration/end time
-    if (duration) {
-      const timeout = setTimeout(() => {
-        const streamData = streams.get(streamId)
-        if (streamData) {
-          streamData.stream.kill()
-          streams.delete(streamId)
-          sendToMainWindow('streaming-stopped', streamId)
-        }
-      }, duration * 1000)
-
-      streams.get(streamId).durationTimeout = timeout
-    } else if (endTime) {
-      const endDateTime = new Date(endTime)
-      const timeUntilEnd = endDateTime.getTime() - Date.now()
-      if (timeUntilEnd > 0) {
-        const timeout = setTimeout(() => {
-          const streamData = streams.get(streamId)
-          if (streamData) {
-            streamData.stream.kill()
-            streams.delete(streamId)
-            sendToMainWindow('streaming-stopped', streamId)
-          }
-        }, timeUntilEnd)
-
-        streams.get(streamId).durationTimeout = timeout
-      }
-    }
-  })
-}
-
-// Handle stream scheduling
-ipcMain.on(
-  'schedule-stream',
-  async (event, { streamId, videoPath, streamKey, startTime, duration, endTime }) => {
-    try {
-      const scheduledTime = new Date(startTime)
-
-      if (scheduledTime < new Date()) {
-        try {
-          event.reply('streaming-started', streamId)
-          await startStreaming(streamId, videoPath, streamKey, duration, endTime)
-        } catch (error) {
-          event.reply('streaming-error', { streamId, message: error.message })
-        }
-      } else {
-        const job = schedule.scheduleJob(scheduledTime, async () => {
-          try {
-            event.reply('streaming-started', streamId)
-            await startStreaming(streamId, videoPath, streamKey, duration, endTime)
-          } catch (error) {
-            event.reply('streaming-error', { streamId, message: error.message })
-          }
-        })
-
-        streams.set(streamId, { scheduledJob: job })
-        event.reply('stream-scheduled', streamId)
-      }
-    } catch (error) {
-      event.reply('scheduling-error', { streamId, message: error.message })
-    }
-  }
-)
-
-// Stop streaming
 ipcMain.on('stop-stream', (event, streamId) => {
-  const streamData = streams.get(streamId)
-  if (!streamData) return
-
-  if (streamData.durationTimeout) {
-    clearTimeout(streamData.durationTimeout)
+  if (streamManager.cleanupStream(streamId)) {
+    streamManager.sendToMainWindow('streaming-stopped', streamId)
   }
-
-  if (streamData.stream) {
-    streamData.stream.kill()
-  }
-
-  if (streamData.scheduledJob) {
-    streamData.scheduledJob.cancel()
-  }
-
-  streams.delete(streamId)
-  sendToMainWindow('streaming-stopped', streamId)
 })
