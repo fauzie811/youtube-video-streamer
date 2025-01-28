@@ -18,8 +18,9 @@
   }
 
   function createNewStream() {
+    const id = Date.now().toString()
     const newStream = {
-      id: Date.now().toString(), // Simple unique ID
+      id: id,
       videoTitle: '',
       videoFile: '',
       streamKey: '',
@@ -28,10 +29,12 @@
       endTime: '',
       isEndByDuration: true,
       status: 'ready', // ready, scheduled, streaming, error
-      statusText: 'Ready'
+      statusText: 'Ready',
+      logs: []
     }
     $streams = [...$streams, newStream]
     selectedStreamId = newStream.id
+    streams.addLog(id, `Stream created (ID: ${id})`)
   }
 
   function deleteStream(id) {
@@ -90,21 +93,32 @@
 
   // Modified IPC listeners to handle multiple streams
   window.electron.ipcRenderer.on('streaming-started', (event, streamId) => {
+    streams.addLog(streamId, 'Stream started')
     $streams = $streams.map((s) =>
       s.id === streamId ? { ...s, status: 'streaming', statusText: 'Streaming' } : s
     )
   })
 
   window.electron.ipcRenderer.on('streaming-stopped', (event, streamId) => {
+    streams.addLog(streamId, 'Stream stopped')
     $streams = $streams.map((s) =>
       s.id === streamId ? { ...s, status: 'ready', statusText: 'Ready' } : s
     )
   })
 
   window.electron.ipcRenderer.on('streaming-error', (event, { streamId, message }) => {
+    streams.addLog(streamId, `Error: ${message}`)
     $streams = $streams.map((s) =>
       s.id === streamId ? { ...s, status: 'error', statusText: `Error: ${message}` } : s
     )
+  })
+
+  window.electron.ipcRenderer.on('stream-scheduled', (event, { streamId, scheduledTime }) => {
+    streams.addLog(streamId, `Stream scheduled (${scheduledTime.toLocaleString()})`)
+  })
+
+  window.electron.ipcRenderer.on('stream-log', (event, { streamId, message }) => {
+    streams.addLog(streamId, message)
   })
 </script>
 
@@ -160,6 +174,10 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+  }
+  :global(svelte-split-pane) {
+    flex: 1;
+    min-height: 0;
   }
   .sidebar {
     display: flex;

@@ -141,8 +141,13 @@
   </div>
 </FormField>
 
+<div class="log-container">
+  <textarea id="logOutput" readonly value={stream.logs?.join('\n') || ''} rows="5"></textarea>
+</div>
+
 <style>
-  :global(input) {
+  :global(input),
+  :global(textarea) {
     width: 100%;
   }
   .file-group {
@@ -160,5 +165,11 @@
   }
   .button-group :global(button) {
     margin: 0;
+  }
+  textarea {
+    resize: vertical;
+    font-family: monospace;
+    font-size: 8pt;
+    padding: 6px;
   }
 </style>

@@ -62,28 +62,35 @@ body {
 }
 
 input,
+textarea,
 button {
   color: inherit;
   font: inherit;
 }
 input[type='text'],
 input[type='datetime-local'],
-input[type='time'] {
+input[type='time'],
+textarea {
   background: var(--input-background);
   border: 1px solid var(--input-border);
   border-radius: 2px;
-  padding: 0 8px;
+  padding: 0 6px;
   height: 24px;
+}
+textarea {
+  height: auto;
 }
 input[type='text']:focus-visible,
 input[type='datetime-local']:focus-visible,
-input[type='time']:focus-visible {
+input[type='time']:focus-visible,
+textarea:focus-visible {
   outline: none;
   border-color: var(--color-accent);
 }
 input[type='text']:disabled,
 input[type='datetime-local']:disabled,
-input[type='time']:disabled {
+input[type='time']:disabled,
+textarea:disabled {
   color: #999;
 }
 

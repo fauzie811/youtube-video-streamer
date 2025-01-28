@@ -104,6 +104,9 @@ class StreamManager {
           this.streams.delete(streamId)
           resolve()
         })
+        .on('stderr', (stderrLine) => {
+          this.sendToMainWindow('stream-log', { streamId, message: `Stderr: ${stderrLine}` })
+        })
         .on('error', (err) => {
           if (err.message?.includes('SIGKILL')) {
             this.streams.delete(streamId)
@@ -154,7 +157,7 @@ class StreamManager {
         })
 
         this.streams.set(streamId, { scheduledJob: job })
-        event.reply('stream-scheduled', streamId)
+        event.reply('stream-scheduled', { streamId, scheduledTime })
       }
     } catch (error) {
       event.reply('scheduling-error', { streamId, message: error.message })
@@ -167,9 +170,9 @@ const streamManager = new StreamManager()
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 640,
-    height: 360,
+    height: 400,
     minWidth: 640,
-    minHeight: 360,
+    minHeight: 400,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -240,6 +243,25 @@ app.on('window-all-closed', () => {
 })
 
 // IPC Handlers
+ipcMain.handle('show-about', () => {
+  const appInfo = {
+    name: app.getName(),
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node
+  }
+
+  dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+    type: 'info',
+    title: 'About',
+    message: `${appInfo.name}`,
+    detail: `Version: ${appInfo.version}\nElectron: ${appInfo.electron}\nChrome: ${appInfo.chrome}\nNode: ${appInfo.node}`,
+    buttons: ['OK'],
+    icon: icon
+  })
+})
+
 ipcMain.handle('select-video', async () => {
   const result = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
     properties: ['openFile'],

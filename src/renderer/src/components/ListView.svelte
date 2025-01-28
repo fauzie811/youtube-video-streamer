@@ -4,6 +4,8 @@
 
 <ul class="list" role="list">
   {#each items as item}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <li
       class="list-item"
       onclick={() => onitemclick(item)}

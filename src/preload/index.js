@@ -3,7 +3,10 @@ import { electronAPI } from '@electron-toolkit/preload'
 // import { Titlebar } from 'custom-electron-titlebar'
 
 // Custom APIs for renderer
-const api = { clipboard }
+const api = {
+  clipboard,
+  showAbout: () => electronAPI.ipcRenderer.invoke('show-about')
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
