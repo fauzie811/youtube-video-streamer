@@ -81,8 +81,6 @@ class StreamManager {
         '4000k',
         '-preset',
         'veryfast',
-        '-profile:v',
-        'high',
         '-tune',
         'zerolatency',
         '-g',
@@ -98,7 +96,9 @@ class StreamManager {
         '-f',
         'flv',
         '-flvflags',
-        'no_duration_filesize'
+        'no_duration_filesize',
+        '-loglevel',
+        'error'
       ])
       .output(streamUrl)
   }
