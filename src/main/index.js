@@ -71,8 +71,35 @@ class StreamManager {
   createFFmpegStream(videoPath, streamKey) {
     const streamUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`
     return ffmpeg(videoPath)
-      .inputOptions(['-stream_loop', '-1', '-re'])
-      .outputOptions(['-b:v', VIDEO_BITRATE, '-preset', 'veryfast', '-codec', 'copy', '-f', 'flv'])
+      .inputOptions(['-stream_loop', '-1', '-re', '-hwaccel', 'auto'])
+      .outputOptions([
+        '-b:v',
+        VIDEO_BITRATE,
+        '-maxrate',
+        VIDEO_BITRATE,
+        '-bufsize',
+        '4000k',
+        '-preset',
+        'veryfast',
+        '-profile:v',
+        'high',
+        '-tune',
+        'zerolatency',
+        '-g',
+        '60',
+        '-keyint_min',
+        '60',
+        '-sc_threshold',
+        '0',
+        '-threads',
+        '0',
+        '-codec',
+        'copy',
+        '-f',
+        'flv',
+        '-flvflags',
+        'no_duration_filesize'
+      ])
       .output(streamUrl)
   }
 
@@ -98,22 +125,30 @@ class StreamManager {
       throw new Error('Video file not found or not accessible')
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const stream = this.createFFmpegStream(videoPath, streamKey)
         .on('end', () => {
-          this.streams.delete(streamId)
+          this.cleanupStream(streamId)
+          this.sendToMainWindow('streaming-stopped', streamId)
           resolve()
         })
         .on('stderr', (stderrLine) => {
           this.sendToMainWindow('stream-log', { streamId, message: `Stderr: ${stderrLine}` })
         })
         .on('error', (err) => {
+          // Handle the error for this specific stream
+          this.cleanupStream(streamId)
+
           if (err.message?.includes('SIGKILL')) {
-            this.streams.delete(streamId)
-            resolve()
+            this.sendToMainWindow('streaming-stopped', streamId)
           } else {
-            reject(err)
+            this.sendToMainWindow('streaming-error', {
+              streamId,
+              message: err.message || 'An error occurred during streaming'
+            })
           }
+
+          resolve() // Resolve instead of reject to prevent error propagation
         })
 
       stream.run()
@@ -136,31 +171,36 @@ class StreamManager {
     event,
     { streamId, videoPath, streamKey, startTime, duration, endTime }
   ) {
+    const startStream = async () => {
+      try {
+        event.reply('streaming-started', streamId)
+        await this.startStreaming(streamId, videoPath, streamKey, duration, endTime)
+      } catch (error) {
+        // Handle any errors that occur during stream setup
+        this.cleanupStream(streamId)
+        event.reply('streaming-error', {
+          streamId,
+          message: error.message || 'Failed to start streaming'
+        })
+      }
+    }
+
     try {
       const scheduledTime = new Date(startTime)
 
       if (scheduledTime < new Date()) {
-        try {
-          event.reply('streaming-started', streamId)
-          await this.startStreaming(streamId, videoPath, streamKey, duration, endTime)
-        } catch (error) {
-          event.reply('streaming-error', { streamId, message: error.message })
-        }
+        await startStream()
       } else {
-        const job = schedule.scheduleJob(scheduledTime, async () => {
-          try {
-            event.reply('streaming-started', streamId)
-            await this.startStreaming(streamId, videoPath, streamKey, duration, endTime)
-          } catch (error) {
-            event.reply('streaming-error', { streamId, message: error.message })
-          }
-        })
-
+        const job = schedule.scheduleJob(scheduledTime, startStream)
         this.streams.set(streamId, { scheduledJob: job })
         event.reply('stream-scheduled', { streamId, scheduledTime })
       }
     } catch (error) {
-      event.reply('scheduling-error', { streamId, message: error.message })
+      this.cleanupStream(streamId)
+      event.reply('scheduling-error', {
+        streamId,
+        message: error.message || 'Failed to schedule stream'
+      })
     }
   }
 }
