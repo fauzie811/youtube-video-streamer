@@ -125,46 +125,67 @@ class StreamManager {
       throw new Error('Video file not found or not accessible')
     }
 
-    return new Promise((resolve) => {
-      const stream = this.createFFmpegStream(videoPath, streamKey)
-        .on('end', () => {
-          this.cleanupStream(streamId)
-          this.sendToMainWindow('streaming-stopped', streamId)
-          resolve()
-        })
-        .on('stderr', (stderrLine) => {
-          this.sendToMainWindow('stream-log', { streamId, message: `Stderr: ${stderrLine}` })
-        })
-        .on('error', (err) => {
-          // Handle the error for this specific stream
-          this.cleanupStream(streamId)
+    const MAX_RETRIES = 5
+    const RETRY_DELAY = 3000 // 3 seconds
+    let retryCount = 0
 
-          if (err.message?.includes('SIGKILL')) {
+    const startStreamWithRetry = () => {
+      return new Promise((resolve) => {
+        const stream = this.createFFmpegStream(videoPath, streamKey)
+          .on('end', () => {
+            this.cleanupStream(streamId)
             this.sendToMainWindow('streaming-stopped', streamId)
-          } else {
-            this.sendToMainWindow('streaming-error', {
-              streamId,
-              message: err.message || 'An error occurred during streaming'
-            })
-          }
+            resolve()
+          })
+          .on('stderr', (stderrLine) => {
+            this.sendToMainWindow('stream-log', { streamId, message: `Stderr: ${stderrLine}` })
+          })
+          .on('error', (err) => {
+            // Handle the error for this specific stream
+            this.cleanupStream(streamId)
 
-          resolve() // Resolve instead of reject to prevent error propagation
+            if (err.message?.includes('SIGKILL')) {
+              this.sendToMainWindow('streaming-stopped', streamId)
+              resolve()
+            } else {
+              if (retryCount < MAX_RETRIES) {
+                retryCount++
+                this.sendToMainWindow('streaming-error', {
+                  streamId,
+                  message: `Stream error, retrying (${retryCount}/${MAX_RETRIES}): ${err.message}`
+                })
+
+                // Retry after delay
+                setTimeout(() => {
+                  startStreamWithRetry().then(resolve)
+                }, RETRY_DELAY)
+              } else {
+                this.sendToMainWindow('streaming-error', {
+                  streamId,
+                  message: `Stream failed after ${MAX_RETRIES} retries: ${err.message}`
+                })
+                resolve()
+              }
+            }
+          })
+
+        stream.run()
+
+        this.streams.set(streamId, {
+          stream,
+          stopJob: null
         })
 
-      stream.run()
-
-      this.streams.set(streamId, {
-        stream,
-        stopJob: null
+        if (duration) {
+          const endDate = new Date(Date.now() + duration * 1000)
+          this.setupStreamEndJob(streamId, endDate)
+        } else if (endTime) {
+          this.setupStreamEndJob(streamId, endTime)
+        }
       })
+    }
 
-      if (duration) {
-        const endDate = new Date(Date.now() + duration * 1000)
-        this.setupStreamEndJob(streamId, endDate)
-      } else if (endTime) {
-        this.setupStreamEndJob(streamId, endTime)
-      }
-    })
+    return startStreamWithRetry()
   }
 
   async handleStreamScheduling(
