@@ -132,6 +132,10 @@ class StreamManager {
     const startStreamWithRetry = () => {
       return new Promise((resolve) => {
         const stream = this.createFFmpegStream(videoPath, streamKey)
+          .on('start', (command) => {
+            this.sendToMainWindow('streaming-started', streamId)
+            this.sendToMainWindow('stream-log', { streamId, message: `FFMpeg command: ${command}` })
+          })
           .on('end', () => {
             this.cleanupStream(streamId)
             this.sendToMainWindow('streaming-stopped', streamId)
@@ -194,7 +198,6 @@ class StreamManager {
   ) {
     const startStream = async () => {
       try {
-        event.reply('streaming-started', streamId)
         await this.startStreaming(streamId, videoPath, streamKey, duration, endTime)
       } catch (error) {
         // Handle any errors that occur during stream setup
