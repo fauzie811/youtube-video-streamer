@@ -128,6 +128,7 @@ class StreamManager {
     const MAX_RETRIES = 5
     const RETRY_DELAY = 3000 // 3 seconds
     let retryCount = 0
+    const initialStartTime = Date.now()
 
     const startStreamWithRetry = () => {
       return new Promise((resolve) => {
@@ -177,11 +178,15 @@ class StreamManager {
 
         this.streams.set(streamId, {
           stream,
-          stopJob: null
+          stopJob: null,
+          initialStartTime
         })
 
         if (duration) {
-          const endDate = new Date(Date.now() + duration * 1000)
+          // Calculate remaining duration based on initial start time
+          const elapsedTime = (Date.now() - initialStartTime) / 1000
+          const remainingDuration = Math.max(0, duration - elapsedTime)
+          const endDate = new Date(Date.now() + remainingDuration * 1000)
           this.setupStreamEndJob(streamId, endDate)
         } else if (endTime) {
           this.setupStreamEndJob(streamId, endTime)
