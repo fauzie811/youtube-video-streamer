@@ -71,26 +71,12 @@ class StreamManager {
   createFFmpegStream(videoPath, streamKey) {
     const streamUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`
     return ffmpeg(videoPath)
-      .inputOptions(['-stream_loop', '-1', '-re', '-hwaccel', 'auto'])
+      .inputOptions(['-stream_loop', '-1', '-re'])
       .outputOptions([
         '-b:v',
         VIDEO_BITRATE,
-        '-maxrate',
-        VIDEO_BITRATE,
-        '-bufsize',
-        '4000k',
         '-preset',
         'veryfast',
-        '-tune',
-        'zerolatency',
-        '-g',
-        '60',
-        '-keyint_min',
-        '60',
-        '-sc_threshold',
-        '0',
-        '-threads',
-        '0',
         '-codec',
         'copy',
         '-f',
