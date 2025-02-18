@@ -113,16 +113,31 @@
   </FormField>
 {:else}
   <FormField label="End Time:" id="endTime">
-    <input
-      type="datetime-local"
-      id="endTime"
-      value={stream.endTime}
-      step="1"
-      disabled={stream.status !== 'ready'}
-      oninput={(e) => {
-        $streams = $streams.map((s) => (s.id === stream.id ? { ...s, endTime: e.target.value } : s))
-      }}
-    />
+    <div class="file-group">
+      <input
+        type="datetime-local"
+        id="endTime"
+        value={stream.endTime}
+        step="1"
+        disabled={stream.status === 'scheduled'}
+        oninput={(e) => {
+          $streams = $streams.map((s) =>
+            s.id === stream.id ? { ...s, endTime: e.target.value } : s
+          )
+        }}
+      />
+      {#if stream.status === 'streaming'}
+        <Button
+          onclick={() =>
+            window.electron.ipcRenderer.send('update-stream-end', {
+              streamId: stream.id,
+              endTime: stream.endTime
+            })}
+        >
+          Update
+        </Button>
+      {/if}
+    </div>
   </FormField>
 {/if}
 
@@ -142,7 +157,13 @@
 </FormField>
 
 <div class="log-container">
-  <textarea id="logOutput" readonly value={stream.logs?.join('\n') || ''} rows="5"></textarea>
+  <textarea
+    id="logOutput"
+    aria-label="Log Output:"
+    readonly
+    value={stream.logs?.join('\n') || ''}
+    rows="5"
+  ></textarea>
 </div>
 
 <style>

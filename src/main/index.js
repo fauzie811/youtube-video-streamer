@@ -92,12 +92,18 @@ class StreamManager {
   setupStreamEndJob(streamId, endTime) {
     const endDateTime = new Date(endTime)
     if (endDateTime > new Date()) {
+      // Cancel existing stop job if it exists
+      const streamData = this.streams.get(streamId)
+      if (streamData?.stopJob) {
+        streamData.stopJob.cancel()
+      }
+
       const stopJob = schedule.scheduleJob(endDateTime, () => {
         if (this.cleanupStream(streamId)) {
           this.sendToMainWindow('streaming-stopped', streamId)
         }
       })
-      const streamData = this.streams.get(streamId)
+
       if (streamData) {
         streamData.stopJob = stopJob
       }
@@ -335,5 +341,16 @@ ipcMain.on('schedule-stream', (event, streamOptions) => {
 ipcMain.on('stop-stream', (event, streamId) => {
   if (streamManager.cleanupStream(streamId)) {
     streamManager.sendToMainWindow('streaming-stopped', streamId)
+  }
+})
+
+ipcMain.on('update-stream-end', (event, { streamId, endTime }) => {
+  const streamData = streamManager.streams.get(streamId)
+  if (streamData?.stream) {
+    streamManager.setupStreamEndJob(streamId, endTime)
+    streamManager.sendToMainWindow('stream-log', {
+      streamId,
+      message: `Stream end time updated to ${new Date(endTime).toLocaleString()}`
+    })
   }
 })
