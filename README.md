@@ -2,6 +2,8 @@
 
 A desktop application that allows you to schedule and stream video files to YouTube. Built with Electron and FFmpeg.
 
+<img width="626" height="393" alt="youtube-video-streamer" src="https://github.com/user-attachments/assets/6e41f04b-e54e-4d1d-a6b4-3507a1f33e18" />
+
 ## Features
 
 - Schedule video streams to YouTube
