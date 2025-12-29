@@ -12,8 +12,8 @@
   // Handle video file selection
   async function selectVideo() {
     const file = await window.electron.ipcRenderer.invoke('select-video')
-    if (file && selectedStream) {
-      $streams = $streams.map((s) => (s.id === selectedStream.id ? { ...s, videoFile: file } : s))
+    if (file && selectedStreamId) {
+      $streams = $streams.map((s) => (s.id === selectedStreamId ? { ...s, videoFile: file } : s))
     }
   }
 
@@ -91,34 +91,52 @@
     window.electron.ipcRenderer.send('stop-stream', streamId)
   }
 
-  // Modified IPC listeners to handle multiple streams
-  window.electron.ipcRenderer.on('streaming-started', (event, streamId) => {
+  // IPC event handlers
+  function handleStreamingStarted(event, streamId) {
     streams.addLog(streamId, 'Stream started')
     $streams = $streams.map((s) =>
       s.id === streamId ? { ...s, status: 'streaming', statusText: 'Streaming' } : s
     )
-  })
+  }
 
-  window.electron.ipcRenderer.on('streaming-stopped', (event, streamId) => {
+  function handleStreamingStopped(event, streamId) {
     streams.addLog(streamId, 'Stream stopped')
     $streams = $streams.map((s) =>
       s.id === streamId ? { ...s, status: 'ready', statusText: 'Ready' } : s
     )
-  })
+  }
 
-  window.electron.ipcRenderer.on('streaming-error', (event, { streamId, message }) => {
+  function handleStreamingError(event, { streamId, message }) {
     streams.addLog(streamId, `Error: ${message}`)
     $streams = $streams.map((s) =>
       s.id === streamId ? { ...s, status: 'error', statusText: `Error: ${message}` } : s
     )
-  })
+  }
 
-  window.electron.ipcRenderer.on('stream-scheduled', (event, { streamId, scheduledTime }) => {
+  function handleStreamScheduled(event, { streamId, scheduledTime }) {
     streams.addLog(streamId, `Stream scheduled (${scheduledTime.toLocaleString()})`)
-  })
+  }
 
-  window.electron.ipcRenderer.on('stream-log', (event, { streamId, message }) => {
+  function handleStreamLog(event, { streamId, message }) {
     streams.addLog(streamId, message)
+  }
+
+  // Register IPC listeners with cleanup
+  $effect(() => {
+    window.electron.ipcRenderer.on('streaming-started', handleStreamingStarted)
+    window.electron.ipcRenderer.on('streaming-stopped', handleStreamingStopped)
+    window.electron.ipcRenderer.on('streaming-error', handleStreamingError)
+    window.electron.ipcRenderer.on('stream-scheduled', handleStreamScheduled)
+    window.electron.ipcRenderer.on('stream-log', handleStreamLog)
+
+    // Cleanup listeners on component unmount
+    return () => {
+      window.electron.ipcRenderer.removeListener('streaming-started', handleStreamingStarted)
+      window.electron.ipcRenderer.removeListener('streaming-stopped', handleStreamingStopped)
+      window.electron.ipcRenderer.removeListener('streaming-error', handleStreamingError)
+      window.electron.ipcRenderer.removeListener('stream-scheduled', handleStreamScheduled)
+      window.electron.ipcRenderer.removeListener('stream-log', handleStreamLog)
+    }
   })
 </script>
 

@@ -105,10 +105,11 @@
       mask="00:00:00"
       maskString="00:00:00"
       type="text"
-      on:change={({ detail }) => {
+      onchange={({ detail }) => {
         const value = detail.inputState.maskedValue
         $streams = $streams.map((s) => (s.id === stream.id ? { ...s, duration: value } : s))
       }}
+      disabled={stream.status !== 'ready'}
     />
   </FormField>
 {:else}

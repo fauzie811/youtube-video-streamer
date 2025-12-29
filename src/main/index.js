@@ -139,15 +139,26 @@ class StreamManager {
           })
           .on('error', (err) => {
             // Handle the error for this specific stream
-            this.cleanupStream(streamId)
+            const streamData = this.streams.get(streamId)
 
             if (err.message?.includes('SIGKILL')) {
+              // Intentional stop - full cleanup
+              this.cleanupStream(streamId)
               this.sendToMainWindow('streaming-stopped', streamId)
               resolve()
             } else {
+              // Only kill current stream process, preserve stream data for retry
+              if (streamData?.stopJob) {
+                streamData.stopJob.cancel()
+                streamData.stopJob = null
+              }
+              if (streamData?.stream) {
+                streamData.stream = null
+              }
+
               if (retryCount < MAX_RETRIES) {
                 retryCount++
-                this.sendToMainWindow('streaming-error', {
+                this.sendToMainWindow('stream-log', {
                   streamId,
                   message: `Stream error, retrying (${retryCount}/${MAX_RETRIES}): ${err.message}`
                 })
@@ -157,6 +168,8 @@ class StreamManager {
                   startStreamWithRetry().then(resolve)
                 }, RETRY_DELAY)
               } else {
+                // Max retries reached - full cleanup
+                this.cleanupStream(streamId)
                 this.sendToMainWindow('streaming-error', {
                   streamId,
                   message: `Stream failed after ${MAX_RETRIES} retries: ${err.message}`
