@@ -1,14 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { app, ipcMain, BrowserWindow, dialog } from 'electron'
 
-// Import test setup
+// Import test setup first
 import './test/setup'
 
 describe('Main Process', () => {
-  beforeEach(() => {
+  // Re-import mocked modules for each test
+  let app, ipcMain, BrowserWindow, dialog
+
+  beforeEach(async () => {
     vi.clearAllMocks()
-    // Reset modules before each test
     vi.resetModules()
+
+    // Re-import mocked modules after reset
+    const electron = await import('electron')
+    app = electron.app
+    ipcMain = electron.ipcMain
+    BrowserWindow = electron.BrowserWindow
+    dialog = electron.dialog
   })
 
   afterEach(() => {
@@ -18,30 +26,49 @@ describe('Main Process', () => {
   it('registers IPC handlers on app ready', async () => {
     await import('./index.js')
 
-    expect(ipcMain.handle).toHaveBeenCalledWith('dialog:openFile', expect.any(Function))
+    expect(ipcMain.handle).toHaveBeenCalledWith('show-about', expect.any(Function))
+    expect(ipcMain.handle).toHaveBeenCalledWith('select-video', expect.any(Function))
     expect(ipcMain.on).toHaveBeenCalledWith('schedule-stream', expect.any(Function))
     expect(ipcMain.on).toHaveBeenCalledWith('stop-stream', expect.any(Function))
+    expect(ipcMain.on).toHaveBeenCalledWith('update-stream-end', expect.any(Function))
   })
 
   it('handles file dialog requests', async () => {
     const mockFilePath = '/path/to/video.mp4'
     dialog.showOpenDialog.mockResolvedValueOnce({ filePaths: [mockFilePath], canceled: false })
 
-    const { handleFileOpen } = await import('./index.js')
-    const result = await handleFileOpen()
+    await import('./index.js')
 
-    expect(dialog.showOpenDialog).toHaveBeenCalledWith({
-      properties: ['openFile'],
-      filters: [{ name: 'Videos', extensions: ['mp4', 'mkv', 'avi', 'mov'] }]
-    })
+    // Get the registered handler for 'select-video'
+    const selectVideoHandler = ipcMain.handle.mock.calls.find(
+      (call) => call[0] === 'select-video'
+    )?.[1]
+
+    expect(selectVideoHandler).toBeDefined()
+
+    const result = await selectVideoHandler()
+
+    expect(dialog.showOpenDialog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        properties: ['openFile'],
+        filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mkv'] }]
+      })
+    )
     expect(result).toBe(mockFilePath)
   })
 
   it('handles canceled file dialog', async () => {
     dialog.showOpenDialog.mockResolvedValueOnce({ filePaths: [], canceled: true })
 
-    const { handleFileOpen } = await import('./index.js')
-    const result = await handleFileOpen()
+    await import('./index.js')
+
+    // Get the registered handler for 'select-video'
+    const selectVideoHandler = ipcMain.handle.mock.calls.find(
+      (call) => call[0] === 'select-video'
+    )?.[1]
+
+    const result = await selectVideoHandler()
 
     expect(result).toBeUndefined()
   })
