@@ -140,42 +140,55 @@ class StreamManager {
           .on('error', (err) => {
             // Handle the error for this specific stream
             const streamData = this.streams.get(streamId)
+            const errorMessage = err.message || ''
 
-            if (err.message?.includes('SIGKILL')) {
+            if (errorMessage.includes('SIGKILL')) {
               // Intentional stop - full cleanup
               this.cleanupStream(streamId)
               this.sendToMainWindow('streaming-stopped', streamId)
               resolve()
+              return
+            }
+
+            // Check for recoverable network errors (Windows: 10053, 10054; Unix equivalents)
+            const isNetworkError =
+              errorMessage.includes('10053') ||
+              errorMessage.includes('10054') ||
+              errorMessage.includes('ECONNRESET') ||
+              errorMessage.includes('ECONNABORTED') ||
+              errorMessage.includes('Connection refused') ||
+              errorMessage.includes('Broken pipe')
+
+            // Only kill current stream process, preserve stream data for retry
+            if (streamData?.stopJob) {
+              streamData.stopJob.cancel()
+              streamData.stopJob = null
+            }
+            if (streamData?.stream) {
+              streamData.stream = null
+            }
+
+            if (retryCount < MAX_RETRIES) {
+              retryCount++
+              // Use exponential backoff for network errors
+              const delay = isNetworkError ? RETRY_DELAY * Math.pow(2, retryCount - 1) : RETRY_DELAY
+              this.sendToMainWindow('stream-log', {
+                streamId,
+                message: `Stream error (${isNetworkError ? 'network' : 'unknown'}), retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES}): ${errorMessage}`
+              })
+
+              // Retry after delay
+              setTimeout(() => {
+                startStreamWithRetry().then(resolve)
+              }, delay)
             } else {
-              // Only kill current stream process, preserve stream data for retry
-              if (streamData?.stopJob) {
-                streamData.stopJob.cancel()
-                streamData.stopJob = null
-              }
-              if (streamData?.stream) {
-                streamData.stream = null
-              }
-
-              if (retryCount < MAX_RETRIES) {
-                retryCount++
-                this.sendToMainWindow('stream-log', {
-                  streamId,
-                  message: `Stream error, retrying (${retryCount}/${MAX_RETRIES}): ${err.message}`
-                })
-
-                // Retry after delay
-                setTimeout(() => {
-                  startStreamWithRetry().then(resolve)
-                }, RETRY_DELAY)
-              } else {
-                // Max retries reached - full cleanup
-                this.cleanupStream(streamId)
-                this.sendToMainWindow('streaming-error', {
-                  streamId,
-                  message: `Stream failed after ${MAX_RETRIES} retries: ${err.message}`
-                })
-                resolve()
-              }
+              // Max retries reached - full cleanup
+              this.cleanupStream(streamId)
+              this.sendToMainWindow('streaming-error', {
+                streamId,
+                message: `Stream failed after ${MAX_RETRIES} retries: ${errorMessage}`
+              })
+              resolve()
             }
           })
 
