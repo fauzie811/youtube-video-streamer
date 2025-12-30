@@ -1,5 +1,5 @@
 <script>
-  import MaskInput from 'svelte-input-mask/MaskInput.svelte'
+  import { maska } from 'maska/svelte'
   import Button from '../components/Button.svelte'
   import FormField from '../components/FormField.svelte'
   import streams from '../stores/streams'
@@ -100,14 +100,12 @@
 
 {#if stream.isEndByDuration}
   <FormField label="Duration:" id="duration">
-    <MaskInput
-      value={stream.duration}
-      mask="00:00:00"
-      maskString="00:00:00"
+    <input
       type="text"
-      onchange={({ detail }) => {
-        const value = detail.inputState.maskedValue
-        $streams = $streams.map((s) => (s.id === stream.id ? { ...s, duration: value } : s))
+      value={stream.duration}
+      use:maska={{ mask: '##:##:##' }}
+      oninput={(e) => {
+        $streams = $streams.map((s) => (s.id === stream.id ? { ...s, duration: e.target.value } : s))
       }}
       disabled={stream.status !== 'ready'}
     />

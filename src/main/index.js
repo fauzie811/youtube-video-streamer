@@ -43,7 +43,7 @@ class StreamManager {
 
   cleanupStream(streamId) {
     const streamData = this.streams.get(streamId)
-    if (!streamData) return false
+    if (!streamData) return
 
     if (streamData.stopJob) {
       streamData.stopJob.cancel()
@@ -58,7 +58,6 @@ class StreamManager {
     }
 
     this.streams.delete(streamId)
-    return true
   }
 
   cleanupAllStreams() {
@@ -99,9 +98,7 @@ class StreamManager {
       }
 
       const stopJob = schedule.scheduleJob(endDateTime, () => {
-        if (this.cleanupStream(streamId)) {
-          this.sendToMainWindow('streaming-stopped', streamId)
-        }
+        this.cleanupStream(streamId)
       })
 
       if (streamData) {
@@ -365,9 +362,8 @@ ipcMain.on('schedule-stream', (event, streamOptions) => {
 })
 
 ipcMain.on('stop-stream', (event, streamId) => {
-  if (streamManager.cleanupStream(streamId)) {
-    streamManager.sendToMainWindow('streaming-stopped', streamId)
-  }
+  streamManager.cleanupStream(streamId)
+  streamManager.sendToMainWindow('streaming-stopped', streamId)
 })
 
 ipcMain.on('update-stream-end', (event, { streamId, endTime }) => {
