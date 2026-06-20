@@ -25,7 +25,7 @@ export function redactKey(text, streamKey) {
   return typeof text === 'string' && streamKey ? text.split(streamKey).join('***') : text
 }
 
-class StreamManager {
+export class StreamManager {
   constructor() {
     this.streams = new Map()
     this.mainWindow = null
@@ -61,6 +61,10 @@ class StreamManager {
 
     if (streamData.scheduledJob) {
       streamData.scheduledJob.cancel()
+    }
+
+    if (streamData.retryTimer) {
+      clearTimeout(streamData.retryTimer)
     }
 
     this.streams.delete(streamId)
@@ -130,6 +134,7 @@ class StreamManager {
         const redact = (text) => redactKey(text, streamKey)
         const stream = this.createFFmpegStream(videoPath, streamKey)
           .on('start', (command) => {
+            retryCount = 0
             this.sendToMainWindow('streaming-started', streamId)
             this.sendToMainWindow('stream-log', {
               streamId,
@@ -188,9 +193,20 @@ class StreamManager {
               })
 
               // Retry after delay
-              setTimeout(() => {
+              const retryTimer = setTimeout(() => {
+                // If the stream was stopped/cleaned up during the backoff window,
+                // do not resurrect it.
+                if (!this.streams.has(streamId)) {
+                  resolve()
+                  return
+                }
                 startStreamWithRetry().then(resolve)
               }, delay)
+
+              const currentData = this.streams.get(streamId)
+              if (currentData) {
+                currentData.retryTimer = retryTimer
+              }
             } else {
               // Max retries reached - full cleanup
               this.cleanupStream(streamId)
