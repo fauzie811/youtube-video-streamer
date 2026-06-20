@@ -1,11 +1,12 @@
-import { contextBridge, clipboard } from 'electron'
+import { contextBridge, clipboard, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 // import { Titlebar } from 'custom-electron-titlebar'
 
 // Custom APIs for renderer
 const api = {
   clipboard,
-  showAbout: () => electronAPI.ipcRenderer.invoke('show-about')
+  showAbout: () => electronAPI.ipcRenderer.invoke('show-about'),
+  getPathForFile: (file) => webUtils.getPathForFile(file)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

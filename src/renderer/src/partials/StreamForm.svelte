@@ -37,7 +37,10 @@
         if (stream.status !== 'ready') return
         const file = e.dataTransfer.files[0]
         if (file) {
-          $streams = $streams.map((s) => (s.id === stream.id ? { ...s, videoFile: file.path } : s))
+          const path = window.api.getPathForFile(file)
+          if (path) {
+            $streams = $streams.map((s) => (s.id === stream.id ? { ...s, videoFile: path } : s))
+          }
         }
       }}
       oninput={(e) => {
