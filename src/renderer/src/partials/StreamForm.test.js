@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/svelte'
 import StreamForm from './StreamForm.svelte'
 import { get } from 'svelte/store'
@@ -70,6 +70,25 @@ describe('StreamForm', () => {
     await fireEvent.click(startButton)
 
     expect(mockProps.scheduleStream).toHaveBeenCalledWith('1')
+  })
+
+  afterEach(() => {
+    window.api = undefined
+  })
+
+  it('uses window.api.getPathForFile for dropped files', async () => {
+    streams.set([{ ...mockStream }])
+    window.api = { getPathForFile: vi.fn(() => '/dropped/video.mp4') }
+
+    render(StreamForm, { props: mockProps })
+
+    const fileInput = screen.getByLabelText('Video File:')
+    const file = new File(['x'], 'video.mp4', { type: 'video/mp4' })
+    await fireEvent.drop(fileInput, { dataTransfer: { files: [file] } })
+
+    expect(window.api.getPathForFile).toHaveBeenCalledWith(file)
+    const updated = get(streams).find((s) => s.id === mockStream.id)
+    expect(updated?.videoFile).toBe('/dropped/video.mp4')
   })
 
   it('displays logs in textarea', () => {
