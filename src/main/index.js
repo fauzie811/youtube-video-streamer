@@ -19,6 +19,12 @@ nativeTheme.themeSource = 'light'
 
 const VIDEO_BITRATE = '2000k'
 
+// Redact the stream key from any text before it is forwarded to the renderer.
+// Replaces every occurrence of the runtime key value with '***'.
+export function redactKey(text, streamKey) {
+  return typeof text === 'string' && streamKey ? text.split(streamKey).join('***') : text
+}
+
 class StreamManager {
   constructor() {
     this.streams = new Map()
@@ -121,10 +127,14 @@ class StreamManager {
 
     const startStreamWithRetry = () => {
       return new Promise((resolve) => {
+        const redact = (text) => redactKey(text, streamKey)
         const stream = this.createFFmpegStream(videoPath, streamKey)
           .on('start', (command) => {
             this.sendToMainWindow('streaming-started', streamId)
-            this.sendToMainWindow('stream-log', { streamId, message: `FFMpeg command: ${command}` })
+            this.sendToMainWindow('stream-log', {
+              streamId,
+              message: redact(`FFMpeg command: ${command}`)
+            })
           })
           .on('end', () => {
             this.cleanupStream(streamId)
@@ -132,12 +142,15 @@ class StreamManager {
             resolve()
           })
           .on('stderr', (stderrLine) => {
-            this.sendToMainWindow('stream-log', { streamId, message: `Stderr: ${stderrLine}` })
+            this.sendToMainWindow('stream-log', {
+              streamId,
+              message: redact(`Stderr: ${stderrLine}`)
+            })
           })
           .on('error', (err) => {
             // Handle the error for this specific stream
             const streamData = this.streams.get(streamId)
-            const errorMessage = err.message || ''
+            const errorMessage = redact(err.message || '')
 
             if (errorMessage.includes('SIGKILL')) {
               // Intentional stop - full cleanup

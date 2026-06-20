@@ -112,3 +112,53 @@ describe('Main Process', () => {
     Object.defineProperty(process, 'platform', { value: originalPlatform })
   })
 })
+
+describe('redactKey', () => {
+  let redactKey
+
+  beforeEach(async () => {
+    vi.resetModules()
+    ;({ redactKey } = await import('./index.js'))
+  })
+
+  const KEY = 'abcd-test-key-1234'
+
+  it('redacts the key from the FFmpeg command (start handler) string', () => {
+    const command = `ffmpeg -i video.mp4 -f flv rtmp://a.rtmp.youtube.com/live2/${KEY}`
+    const sentMessage = redactKey(`FFMpeg command: ${command}`, KEY)
+
+    expect(sentMessage).not.toContain(KEY)
+    expect(sentMessage).toContain('***')
+  })
+
+  it('redacts the key from a stderr line that embeds the RTMP URL', () => {
+    const stderrLine = `Connection to rtmp://a.rtmp.youtube.com/live2/${KEY} failed`
+    const sentMessage = redactKey(`Stderr: ${stderrLine}`, KEY)
+
+    expect(sentMessage).not.toContain(KEY)
+    expect(sentMessage).toContain('***')
+  })
+
+  it('redacts the key from an error message', () => {
+    const errorMessage = `Error: rtmp://a.rtmp.youtube.com/live2/${KEY}: Broken pipe`
+    const sentMessage = redactKey(errorMessage, KEY)
+
+    expect(sentMessage).not.toContain(KEY)
+    expect(sentMessage).toContain('***')
+    // Sentinel tokens used for retry/network detection are preserved
+    expect(sentMessage).toContain('Broken pipe')
+  })
+
+  it('redacts every occurrence of the key', () => {
+    const result = redactKey(`${KEY} and again ${KEY}`, KEY)
+    expect(result).toBe('*** and again ***')
+  })
+
+  it('returns the text unchanged when streamKey is empty', () => {
+    expect(redactKey('no key here', '')).toBe('no key here')
+  })
+
+  it('passes through non-string input', () => {
+    expect(redactKey(undefined, KEY)).toBeUndefined()
+  })
+})
