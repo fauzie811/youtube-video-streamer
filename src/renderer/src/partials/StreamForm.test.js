@@ -43,6 +43,7 @@ describe('StreamForm', () => {
   })
 
   it('handles form input changes', async () => {
+    streams.set([mockStream])
     render(StreamForm, { props: mockProps })
 
     const titleInput = screen.getByLabelText('Channel / Title:')
